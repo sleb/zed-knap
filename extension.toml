@@ -4,7 +4,7 @@ description = "Markdown LSP server — wiki-link navigation"
 version = "0.0.1"
 schema_version = 1
 authors = ["sleb"]
-repository = "https://github.com/sleb/knap"
+repository = "https://github.com/sleb/zed-knap"
 
 [language_servers.knap]
 name = "Knap"
