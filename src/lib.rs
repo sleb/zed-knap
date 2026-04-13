@@ -63,9 +63,16 @@ impl KnapExtension {
 
         let binary_path = format!("knap-{}", release.version);
         zed::download_file(&asset.download_url, &binary_path, DownloadedFileType::GzipTar)?;
-        zed::make_file_executable(&format!("{binary_path}/knap"))?;
 
-        let path = format!("{binary_path}/knap");
+        // The tarball contains a top-level directory named knap-{platform}/,
+        // so the binary lives one level deeper after extraction.
+        let binary_name = match os {
+            Os::Windows => "knap.exe",
+            _ => "knap",
+        };
+        let path = format!("{binary_path}/knap-{platform}/{binary_name}");
+        zed::make_file_executable(&path)?;
+
         self.cached_binary_path = Some(path.clone());
         Ok(path)
     }
