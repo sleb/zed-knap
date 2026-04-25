@@ -26,12 +26,30 @@ impl zed::Extension for KnapExtension {
             env: vec![],
         })
     }
+
 }
 
 impl KnapExtension {
     fn binary_path(&mut self) -> Result<String> {
         if let Some(path) = &self.cached_binary_path {
-            if std::fs::metadata(path).map_or(false, |m| m.is_file()) {
+            if std::fs::metadata(path).is_ok_and(|m| m.is_file()) {
+                return Ok(path.clone());
+            }
+        }
+
+        // Prefer a locally installed binary (e.g. built from source via
+        // `cargo install --path .`) over the downloaded release.
+        let mut local_paths: Vec<String> = vec![
+            "/usr/local/bin/knap".to_string(),
+            "/opt/homebrew/bin/knap".to_string(),
+        ];
+        if let Ok(home) = std::env::var("HOME") {
+            local_paths.push(format!("{home}/.cargo/bin/knap"));
+        }
+        for path in &local_paths {
+            if std::fs::metadata(path).is_ok_and(|m| m.is_file()) {
+                eprintln!("[knap] using local binary: {path}");
+                self.cached_binary_path = Some(path.clone());
                 return Ok(path.clone());
             }
         }
@@ -61,6 +79,7 @@ impl KnapExtension {
             .find(|a| a.name == asset_name)
             .ok_or_else(|| format!("No release asset found for {platform}"))?;
 
+        eprintln!("[knap] downloading binary version {} from GitHub", release.version);
         let binary_path = format!("knap-{}", release.version);
         zed::download_file(&asset.download_url, &binary_path, DownloadedFileType::GzipTar)?;
 
