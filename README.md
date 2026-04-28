@@ -10,6 +10,11 @@ Releases and registers it as the language server for Markdown. All features —
 wiki-link completions, Go to Definition, Find References, rename refactoring —
 are implemented in the knap server and work through Zed's standard LSP support.
 
+> **Backlinks code lens:** knap v0.7 adds a `↑ N backlinks` annotation at the
+> top of every note. Zed support is pending an upcoming Zed release that adds
+> code lens rendering. The annotation will appear automatically once that update
+> ships — no extension change required.
+
 ## Installation
 
 1. Open the Extensions panel in Zed (`cmd+shift+x` on macOS)
