@@ -1,7 +1,10 @@
 use zed_extension_api::{
     self as zed,
+    process::Command as ProcessCommand,
+    serde_json,
     settings::LspSettings,
-    Architecture, DownloadedFileType, GithubReleaseOptions, LanguageServerId, Os, Result, Worktree,
+    Architecture, DownloadedFileType, GithubReleaseOptions, LanguageServerId,
+    LanguageServerInstallationStatus, Os, Result, Worktree,
 };
 
 struct KnapExtension;
@@ -17,7 +20,7 @@ impl zed::Extension for KnapExtension {
         worktree: &Worktree,
     ) -> Result<zed::Command> {
         Ok(zed::Command {
-            command: self.binary_path(language_server_id, worktree)?,
+            command: self.resolve_binary(language_server_id, worktree)?,
             args: vec![],
             env: vec![],
         })
@@ -25,17 +28,22 @@ impl zed::Extension for KnapExtension {
 }
 
 impl KnapExtension {
-    fn binary_path(
+    fn resolve_binary(
         &self,
         language_server_id: &LanguageServerId,
         worktree: &Worktree,
     ) -> Result<String> {
-        // User-configured path takes priority — no download, no version check.
-        let settings = LspSettings::for_worktree(language_server_id.as_ref(), worktree)?;
-        if let Some(path) = settings.binary.and_then(|b| b.path) {
+        let lsp_settings = LspSettings::for_worktree(language_server_id.as_ref(), worktree)?;
+
+        if let Some(path) = lsp_settings.binary.and_then(|b| b.path) {
+            self.check_for_update(language_server_id, &path, &lsp_settings.settings);
             return Ok(path);
         }
 
+        self.download_latest(language_server_id)
+    }
+
+    fn download_latest(&self, language_server_id: &LanguageServerId) -> Result<String> {
         let (os, arch) = zed::current_platform();
         let platform = match (os, arch) {
             (Os::Mac, Architecture::Aarch64) => "aarch64-apple-darwin",
@@ -50,13 +58,23 @@ impl KnapExtension {
             _ => "knap",
         };
 
-        // Always fetch latest release metadata so new versions are picked up on startup.
         let release = zed::latest_github_release(
             "sleb/knap",
             GithubReleaseOptions { require_assets: true, pre_release: false },
-        )?;
+        )
+        .map_err(|e| {
+            let msg = format!(
+                "knap is not installed and GitHub is unreachable ({e}). \
+                Install knap (e.g. `cargo install knap`) then set its path in Zed settings: \
+                \"lsp\": {{ \"knap\": {{ \"binary\": {{ \"path\": \"/path/to/knap\" }} }} }}"
+            );
+            zed::set_language_server_installation_status(
+                language_server_id,
+                &LanguageServerInstallationStatus::Failed(msg.clone()),
+            );
+            msg
+        })?;
 
-        // The versioned directory is the cache key: if it exists, the binary is current.
         let dir = format!("knap-{}", release.version);
         let path = format!("{dir}/knap-{platform}/{binary_name}");
 
@@ -76,6 +94,59 @@ impl KnapExtension {
         zed::make_file_executable(&path)?;
 
         Ok(path)
+    }
+
+    // Best-effort: logs a warning if the configured binary is behind the latest GitHub release.
+    // Skips silently if GitHub is unreachable or the version can't be determined.
+    fn check_for_update(
+        &self,
+        language_server_id: &LanguageServerId,
+        path: &str,
+        settings: &Option<serde_json::Value>,
+    ) {
+        let ignore = settings
+            .as_ref()
+            .and_then(|s: &serde_json::Value| s.get("ignore_update_warnings"))
+            .and_then(|v: &serde_json::Value| v.as_bool())
+            .unwrap_or(false);
+        if ignore {
+            return;
+        }
+
+        let Ok(release) = zed::latest_github_release(
+            "sleb/knap",
+            GithubReleaseOptions { require_assets: false, pre_release: false },
+        ) else {
+            return;
+        };
+        let latest = release.version.trim_start_matches('v');
+
+        let Ok(output) = ProcessCommand::new(path).arg("--version").output() else {
+            return;
+        };
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let Some(installed) = stdout
+            .split_whitespace()
+            .find_map(|w| {
+                let v = w.trim_start_matches('v');
+                v.starts_with(|c: char| c.is_ascii_digit()).then_some(v)
+            })
+        else {
+            return;
+        };
+
+        if installed != latest {
+            let msg = format!(
+                "knap {installed} is outdated (latest: {latest}). \
+                Update your binary or add \"ignore_update_warnings\": true under \
+                \"lsp\" > \"knap\" > \"settings\" in your Zed settings to suppress this warning."
+            );
+            eprintln!("[knap] WARNING: {msg}");
+            zed::set_language_server_installation_status(
+                language_server_id,
+                &LanguageServerInstallationStatus::Failed(msg),
+            );
+        }
     }
 }
 
