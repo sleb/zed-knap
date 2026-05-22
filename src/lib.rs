@@ -1,57 +1,39 @@
 use zed_extension_api::{
-    self as zed, Architecture, DownloadedFileType, GithubReleaseOptions, LanguageServerId, Os,
-    Result, Worktree,
+    self as zed,
+    settings::LspSettings,
+    Architecture, DownloadedFileType, GithubReleaseOptions, LanguageServerId, Os, Result, Worktree,
 };
 
-struct KnapExtension {
-    cached_binary_path: Option<String>,
-}
+struct KnapExtension;
 
 impl zed::Extension for KnapExtension {
     fn new() -> Self {
-        Self {
-            cached_binary_path: None,
-        }
+        Self
     }
 
     fn language_server_command(
         &mut self,
-        _language_server_id: &LanguageServerId,
-        _worktree: &Worktree,
+        language_server_id: &LanguageServerId,
+        worktree: &Worktree,
     ) -> Result<zed::Command> {
-        let binary_path = self.binary_path()?;
         Ok(zed::Command {
-            command: binary_path,
+            command: self.binary_path(language_server_id, worktree)?,
             args: vec![],
             env: vec![],
         })
     }
-
 }
 
 impl KnapExtension {
-    fn binary_path(&mut self) -> Result<String> {
-        if let Some(path) = &self.cached_binary_path {
-            if std::fs::metadata(path).is_ok_and(|m| m.is_file()) {
-                return Ok(path.clone());
-            }
-        }
-
-        // Prefer a locally installed binary (e.g. built from source via
-        // `cargo install --path .`) over the downloaded release.
-        let mut local_paths: Vec<String> = vec![
-            "/usr/local/bin/knap".to_string(),
-            "/opt/homebrew/bin/knap".to_string(),
-        ];
-        if let Ok(home) = std::env::var("HOME") {
-            local_paths.push(format!("{home}/.cargo/bin/knap"));
-        }
-        for path in &local_paths {
-            if std::fs::metadata(path).is_ok_and(|m| m.is_file()) {
-                eprintln!("[knap] using local binary: {path}");
-                self.cached_binary_path = Some(path.clone());
-                return Ok(path.clone());
-            }
+    fn binary_path(
+        &self,
+        language_server_id: &LanguageServerId,
+        worktree: &Worktree,
+    ) -> Result<String> {
+        // User-configured path takes priority — no download, no version check.
+        let settings = LspSettings::for_worktree(language_server_id.as_ref(), worktree)?;
+        if let Some(path) = settings.binary.and_then(|b| b.path) {
+            return Ok(path);
         }
 
         let (os, arch) = zed::current_platform();
@@ -63,14 +45,24 @@ impl KnapExtension {
             (Os::Windows, Architecture::X8664) => "x86_64-pc-windows-msvc",
             _ => return Err("Unsupported platform".into()),
         };
+        let binary_name = match os {
+            Os::Windows => "knap.exe",
+            _ => "knap",
+        };
 
+        // Always fetch latest release metadata so new versions are picked up on startup.
         let release = zed::latest_github_release(
             "sleb/knap",
-            GithubReleaseOptions {
-                require_assets: true,
-                pre_release: false,
-            },
+            GithubReleaseOptions { require_assets: true, pre_release: false },
         )?;
+
+        // The versioned directory is the cache key: if it exists, the binary is current.
+        let dir = format!("knap-{}", release.version);
+        let path = format!("{dir}/knap-{platform}/{binary_name}");
+
+        if std::fs::metadata(&path).is_ok_and(|m| m.is_file()) {
+            return Ok(path);
+        }
 
         let asset_name = format!("knap-{platform}.tar.gz");
         let asset = release
@@ -79,20 +71,10 @@ impl KnapExtension {
             .find(|a| a.name == asset_name)
             .ok_or_else(|| format!("No release asset found for {platform}"))?;
 
-        eprintln!("[knap] downloading binary version {} from GitHub", release.version);
-        let binary_path = format!("knap-{}", release.version);
-        zed::download_file(&asset.download_url, &binary_path, DownloadedFileType::GzipTar)?;
-
-        // The tarball contains a top-level directory named knap-{platform}/,
-        // so the binary lives one level deeper after extraction.
-        let binary_name = match os {
-            Os::Windows => "knap.exe",
-            _ => "knap",
-        };
-        let path = format!("{binary_path}/knap-{platform}/{binary_name}");
+        eprintln!("[knap] downloading version {} from GitHub", release.version);
+        zed::download_file(&asset.download_url, &dir, DownloadedFileType::GzipTar)?;
         zed::make_file_executable(&path)?;
 
-        self.cached_binary_path = Some(path.clone());
         Ok(path)
     }
 }
