@@ -6,14 +6,9 @@ A [Zed](https://zed.dev) extension that connects the
 [knap](https://github.com/sleb/knap) language server to Zed for Markdown files.
 
 The extension's role is narrow: it downloads the `knap` binary from GitHub
-Releases and registers it as the language server for Markdown. All features —
-wiki-link completions, Go to Definition, Find References, rename refactoring —
-are implemented in the knap server and work through Zed's standard LSP support.
-
-> **Backlinks code lens:** knap v0.7 adds a `↑ N backlinks` annotation at the
-> top of every note. Zed support is pending an upcoming Zed release that adds
-> code lens rendering. The annotation will appear automatically once that update
-> ships — no extension change required.
+Releases and registers it as the language server for Markdown. All features are
+implemented in the server — see the [knap README](https://github.com/sleb/knap)
+for a full list.
 
 ## Getting started
 
@@ -25,7 +20,7 @@ The extension downloads the `knap` binary automatically on first use and keeps i
 ## Configuration
 
 All settings live under `"lsp" > "knap"` in your Zed `settings.json`
-(`cmd+,` → *Open Settings File*).
+(`cmd+,` → _Open Settings File_).
 
 ### Custom binary path
 

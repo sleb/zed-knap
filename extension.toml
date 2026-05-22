@@ -1,6 +1,6 @@
 id = "knap"
 name = "Knap"
-description = "Markdown LSP server — wiki-link navigation"
+description = "Markdown LSP server — linking, navigation, and diagnostics"
 version = "0.0.1"
 schema_version = 1
 authors = ["sleb"]
