@@ -82,7 +82,16 @@ impl KnapExtension {
             return Ok(path);
         }
 
-        let asset_name = format!("knap-{platform}.tar.gz");
+        let (asset_name, file_type) = match os {
+            Os::Windows => (
+                format!("knap-{platform}.zip"),
+                DownloadedFileType::Zip,
+            ),
+            _ => (
+                format!("knap-{platform}.tar.gz"),
+                DownloadedFileType::GzipTar,
+            ),
+        };
         let asset = release
             .assets
             .iter()
@@ -90,7 +99,7 @@ impl KnapExtension {
             .ok_or_else(|| format!("No release asset found for {platform}"))?;
 
         eprintln!("[knap] downloading version {} from GitHub", release.version);
-        zed::download_file(&asset.download_url, &dir, DownloadedFileType::GzipTar)?;
+        zed::download_file(&asset.download_url, &dir, file_type)?;
         zed::make_file_executable(&path)?;
 
         Ok(path)
