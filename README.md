@@ -32,33 +32,21 @@ The extension downloads the `knap` binary automatically on first use and keeps i
 All settings live under `"lsp" > "knap"` in your Zed `settings.json`
 (`cmd+,` → _Open Settings File_).
 
-### Server configuration
+### Server options
 
-Pass knap options via `initialization_options`. knap works with zero
-configuration for a standard single-folder Markdown workspace; the most
-common options are:
-
-| Option              | Type       | Default  | Description                                              |
-| ------------------- | ---------- | -------- | -------------------------------------------------------- |
-| `extensions`        | `string[]` | `["md"]` | File extensions treated as notes                         |
-| `newNoteDir`        | `string`   | —        | Folder where Quick Fix "Create note" places new files    |
-| `frontmatterSchema` | `object`   | —        | Allowed frontmatter keys and values; enables completions and diagnostics |
+Pass knap server options via `initialization_options`:
 
 ```json
 {
   "lsp": {
     "knap": {
-      "initialization_options": {
-        "extensions": ["md", "mdx"],
-        "newNoteDir": "0-Inbox"
-      }
+      "initialization_options": {}
     }
   }
 }
 ```
 
-See [Getting Started](https://github.com/sleb/knap/blob/main/docs/GETTING_STARTED.md)
-in the knap repo for the full configuration reference, including `frontmatterSchema`.
+See the [knap README](https://github.com/sleb/knap) for all available options.
 
 ### Code lens
 
@@ -89,12 +77,8 @@ installed via `cargo install knap`), point the extension at it:
 ```
 
 When a custom path is set the extension checks GitHub on startup and warns in
-the language server log if your binary is behind the latest release.
-
-### Suppressing the outdated binary warning
-
-If you are intentionally running an older version, silence the warning by adding
-`"ignore_update_warnings"` to the `"settings"` block:
+the language server log if your binary is behind the latest release. To silence
+that warning, add `"ignore_update_warnings"` to the `"settings"` block:
 
 ```json
 {
