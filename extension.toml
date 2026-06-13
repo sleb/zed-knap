@@ -1,7 +1,7 @@
 id = "knap"
 name = "Knap"
 description = "Markdown LSP server — linking, navigation, and diagnostics"
-version = "0.0.1"
+version = "0.1.0"
 schema_version = 1
 authors = ["Scott LeBaron <scott.g.lebaron@gmail.com>"]
 repository = "https://github.com/sleb/zed-knap"
