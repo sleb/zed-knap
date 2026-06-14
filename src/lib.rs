@@ -106,37 +106,49 @@ impl KnapExtension {
     }
 
     // Best-effort: logs a warning if the configured binary is behind the latest GitHub release.
-    // Skips silently if GitHub is unreachable or the version can't be determined.
+    // Skips silently if GitHub is unreachable; logs to stderr if the binary can't be queried.
     fn check_for_update(
         &self,
         language_server_id: &LanguageServerId,
         path: &str,
         settings: &Option<serde_json::Value>,
     ) {
+        if let Err(e) = self.try_check_for_update(language_server_id, path, settings) {
+            eprintln!("[knap] update check failed: {e}");
+        }
+    }
+
+    fn try_check_for_update(
+        &self,
+        language_server_id: &LanguageServerId,
+        path: &str,
+        settings: &Option<serde_json::Value>,
+    ) -> Result<()> {
         let ignore = settings
             .as_ref()
             .and_then(|s: &serde_json::Value| s.get("ignore_update_warnings"))
             .and_then(|v: &serde_json::Value| v.as_bool())
             .unwrap_or(false);
         if ignore {
-            return;
+            return Ok(());
         }
 
+        // Offline or GitHub unreachable: skip silently.
         let Ok(release) = zed::latest_github_release(
             "sleb/knap",
             GithubReleaseOptions { require_assets: false, pre_release: false },
         ) else {
-            return;
+            return Ok(());
         };
         let latest = release.version.trim_start_matches('v');
 
-        let Ok(output) = ProcessCommand::new(path).arg("--version").output() else {
-            return;
-        };
+        let output = ProcessCommand::new(path)
+            .arg("--version")
+            .output()
+            .map_err(|e| format!("failed to run `{path} --version`: {e}"))?;
         let stdout = String::from_utf8_lossy(&output.stdout);
-        let Some(installed) = parse_installed_version(&stdout) else {
-            return;
-        };
+        let installed = parse_installed_version(&stdout)
+            .ok_or_else(|| format!("could not parse version from `{path} --version` output"))?;
 
         if installed != latest {
             let msg = format!(
@@ -150,6 +162,8 @@ impl KnapExtension {
                 &LanguageServerInstallationStatus::Failed(msg),
             );
         }
+
+        Ok(())
     }
 }
 
