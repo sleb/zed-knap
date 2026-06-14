@@ -134,13 +134,7 @@ impl KnapExtension {
             return;
         };
         let stdout = String::from_utf8_lossy(&output.stdout);
-        let Some(installed) = stdout
-            .split_whitespace()
-            .find_map(|w| {
-                let v = w.trim_start_matches('v');
-                v.starts_with(|c: char| c.is_ascii_digit()).then_some(v)
-            })
-        else {
+        let Some(installed) = parse_installed_version(&stdout) else {
             return;
         };
 
@@ -159,4 +153,41 @@ impl KnapExtension {
     }
 }
 
+fn parse_installed_version(output: &str) -> Option<&str> {
+    output.split_whitespace().find_map(|w| {
+        let v = w.trim_start_matches('v');
+        v.starts_with(|c: char| c.is_ascii_digit()).then_some(v)
+    })
+}
+
 zed::register_extension!(KnapExtension);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_bare_version() {
+        assert_eq!(parse_installed_version("knap 0.1.2"), Some("0.1.2"));
+    }
+
+    #[test]
+    fn parses_v_prefixed_version() {
+        assert_eq!(parse_installed_version("knap v0.1.2"), Some("0.1.2"));
+    }
+
+    #[test]
+    fn parses_version_only() {
+        assert_eq!(parse_installed_version("0.1.2"), Some("0.1.2"));
+    }
+
+    #[test]
+    fn returns_none_for_empty_output() {
+        assert_eq!(parse_installed_version(""), None);
+    }
+
+    #[test]
+    fn returns_none_for_non_version_output() {
+        assert_eq!(parse_installed_version("error: something went wrong"), None);
+    }
+}

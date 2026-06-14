@@ -10,10 +10,12 @@ content belongs here.
 ## Commands
 
 ```bash
-cargo build        # build the extension (native)
-zed ext build      # compile to WASM for Zed
-zed ext publish    # publish to the Zed extension registry
+cargo build   # build and type-check the extension
 ```
+
+To test locally, use **Install Dev Extension** in Zed's Extensions panel and point it at this directory.
+
+Publishing requires a PR to [zed-industries/extensions](https://github.com/zed-industries/extensions) — see `docs/RELEASING.md`.
 
 ## Scope
 

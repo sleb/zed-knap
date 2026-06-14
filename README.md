@@ -5,10 +5,7 @@
 A [Zed](https://zed.dev) extension that connects the
 [knap](https://github.com/sleb/knap) language server to Zed for Markdown files.
 
-The extension's role is narrow: it downloads the `knap` binary from GitHub
-Releases and registers it as the language server for Markdown. All features are
-implemented in the server — see the [knap README](https://github.com/sleb/knap)
-for the full list.
+The extension's role is narrow: it downloads the `knap` binary and registers it as the language server for Markdown. All features are implemented in the server — see the [knap README](https://github.com/sleb/knap) for the full list.
 
 ## What you get
 
